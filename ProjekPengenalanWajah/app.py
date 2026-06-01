@@ -1,21 +1,23 @@
 import cv2
+import streamlit as st
+import numpy as np
 
-# Menggunakan model wajah bawaan OpenCV langsung
+# Judul utama di halaman Website
+st.title("Projek Deteksi Wajah Real-time")
+st.write("Aplikasi ini mendeteksi wajah langsung melalui kamera HP/Laptop kamu.")
+
+# Memanggil model wajah bawaan OpenCV
 cascPath = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
 faceCascade = cv2.CascadeClassifier(cascPath)
 
-# Membuka kamera utama
-video_capture = cv2.VideoCapture(0)
+# Mengambil input kamera langsung dari browser HP/Laptop
+camera = st.camera_input("Ambil Foto untuk Deteksi Wajah")
 
-while True:
-    # Ambil gambar frame demi frame
-    rect, frame = video_capture.read()    
+if camera is not None:
+    # Mengubah format gambar dari browser agar bisa dibaca OpenCV
+    file_bytes = np.asarray(bytearray(camera.read()), dtype=np.uint8)
+    frame = cv2.imdecode(file_bytes, 1)
     
-    # Antisipasi jika kamera macet
-    if not rect or frame is None:
-        print("Peringatan: Kamera gagal merespon.")
-        break
-        
     # Mengubah ke abu-abu untuk proses deteksi
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
@@ -24,30 +26,19 @@ while True:
         gray,
         scaleFactor=1.1,
         minNeighbors=5,
-        minSize=(30, 30),
-        flags=cv2.CASCADE_SCALE_IMAGE
+        minSize=(30, 30)
     )
 
-    # NOMOR 1: Menghitung jumlah wajah yang terdeteksi
-    # len(faces) akan menghitung jumlah kotak wajah yang ditemukan oleh OpenCV
+    # NOMOR 1: Menghitung jumlah wajah
     jumlah_wajah = len(faces)
-    
-    # Menampilkan teks jumlah wajah di layar kamera (Pojok kiri atas)
-    # Parameter: (frame, teks, koordinat_xy, jenis_font, ukuran_font, warna_BGR, ketebalan)
-    cv2.putText(frame, f"Jumlah Wajah: {jumlah_wajah}", (20, 40), 
-                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+    st.success(f"Jumlah Wajah Terdeteksi: {jumlah_wajah}")
 
-    # NOMOR 3: Menggambar KOTAK HIJAU di setiap wajah yang terdeteksi
+    # NOMOR 3: Menggambar KOTAK HIJAU di setiap wajah
     for (x, y, w, h) in faces:        
-        # Menggunakan cv2.rectangle dengan warna hijau terang (0, 255, 0)
-        cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+        cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 3)
        
-    # Menampilkan hasil video
-    cv2.imshow('Projek Deteksi Wajah - Tekan Q untuk Keluar', frame)
-
-    # Tekan 'q' untuk keluar
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
-
-video_capture.release()
-cv2.destroyAllWindows()
+    # Mengubah kembali format warna ke RGB agar pas ditampilkan di web
+    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    
+    # Tampilkan hasil foto yang sudah diberi kotak hijau ke halaman web
+    st.image(frame, caption="Hasil Deteksi Wajah", use_container_width=True)
