@@ -1,45 +1,51 @@
 import cv2
 import streamlit as st
-from streamlit_webrtc import webrtc_streamer, VideoTransformerBase
+import numpy as np
 
-st.title("Projek Deteksi Wajah Real-time (LIVE)")
-st.write("Aplikasi akan mendeteksi wajahmu secara otomatis dari video kamera.")
+st.title("Projek Deteksi Wajah Otomatis")
+st.write("Centang saklar di bawah untuk menyalakan kamera dan mendeteksi wajah secara otomatis!")
 
 # Memanggil model wajah bawaan OpenCV
 cascPath = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
 faceCascade = cv2.CascadeClassifier(cascPath)
 
-class VideoProcessor(VideoTransformerBase):
-    def transform(self, frame):
-        img = frame.to_ndarray(format="bgr24")
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+# Membuat SAKLAR AKTIFKAN KAMERA (Tanpa tombol potret)
+run = st.checkbox('Nyalakan Kamera')
 
-        faces = faceCascade.detectMultiScale(
-            gray,
-            scaleFactor=1.1,
-            minNeighbors=5,
-            minSize=(30, 30)
-        )
+# Tempat untuk menampilkan video stream
+FRAME_WINDOW = st.image([])
 
-        jumlah_wajah = len(faces)
+# Menggunakan webcam bawaan Streamlit secara looping otomatis jika saklar ON
+camera = st.camera_input("Kamera Terhubung", label_visibility="collapsed")
 
-        for (x, y, w, h) in faces:        
-            cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 3)
-            
-        cv2.putText(img, f"Jumlah Wajah: {jumlah_wajah}", (20, 50), 
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-            
-        return img
+if run and camera is not None:
+    # Mengubah format gambar dari browser agar bisa dibaca OpenCV
+    file_bytes = np.asarray(bytearray(camera.read()), dtype=np.uint8)
+    frame = cv2.imdecode(file_bytes, 1)
+    
+    # Mengubah ke abu-abu untuk proses deteksi
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-# MENAMBAHKAN JALUR PINTAS (STUN SERVER GOOGLE) AGAR TIDAK BLOCKED
-RTC_CONFIGURATION = {
-    "iceServers": [{"urls": ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"]}]
-}
+    # Proses deteksi wajah
+    faces = faceCascade.detectMultiScale(
+        gray,
+        scaleFactor=1.1,
+        minNeighbors=5,
+        minSize=(30, 30)
+    )
 
-# Menjalankan modul kamera live video dengan konfigurasi baru
-webrtc_streamer(
-    key="deteksi-wajah-live", 
-    video_processor_factory=VideoProcessor,
-    rtc_configuration=RTC_CONFIGURATION, # Jalur pintas dipasang di sini
-    media_stream_constraints={"video": True, "audio": False}
-)
+    # Menghitung jumlah wajah
+    jumlah_wajah = len(faces)
+    st.success(f"Jumlah Wajah Terdeteksi: {jumlah_wajah}")
+
+    # Menggambar KOTAK HIJAU di setiap wajah
+    for (x, y, w, h) in faces:        
+        cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 3)
+       
+    # Mengubah kembali format warna ke RGB agar pas ditampilkan di web
+    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    
+    # Tampilkan hasil gambar yang sudah dikotaki ke layar web secara real-time
+    FRAME_WINDOW.image(frame)
+else:
+    st.info("Kamera dinonaktifkan. Silakan centang 'Nyalakan Kamera' di atas.")
